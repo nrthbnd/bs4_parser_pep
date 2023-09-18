@@ -28,11 +28,6 @@ def configure_argument_parser(available_modes):
         choices=('pretty', 'file'),
         help='Дополнительные способы вывода данных'
     )
-    parser.add_argument(
-        '-p',
-        '--pep',
-        help='Загрузка документации PEP.'
-    )
     return parser
 
 

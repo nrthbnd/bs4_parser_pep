@@ -17,4 +17,13 @@ EXPECTED_STATUS = {
     '': ('Draft', 'Active'),
 }
 
-STATUS_LIST = ['A', 'D', 'F', 'P', 'R', 'S', 'W', '']
+STATUS_DICT = {
+    'A': 0,
+    'D': 0,
+    'F': 0,
+    'P': 0,
+    'R': 0,
+    'S': 0,
+    'W': 0,
+    '': 0,
+}

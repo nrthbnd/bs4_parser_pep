@@ -8,12 +8,15 @@ from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
 from constants import (BASE_DIR, EXPECTED_STATUS,
-                       MAIN_DOC_URL, PEP_DOC_URL, STATUS_LIST)
+                       MAIN_DOC_URL, PEP_DOC_URL, STATUS_DICT)
+from exceptions import ParserFindAllVersionsException
 from outputs import control_output
 from utils import find_tag, get_response, get_correct_status
 
 
 def whats_new(session):
+    """Собирает ссылки на статьи о нововведениях в Python и забирает
+    с них информацию об авторах и редакторах."""
     whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
     response = get_response(session, whats_new_url)
     if response is None:
@@ -45,6 +48,7 @@ def whats_new(session):
 
 
 def latest_versions(session):
+    """Собирает информацию о статусах версий Python."""
     response = get_response(session, MAIN_DOC_URL)
     if response is None:
         return
@@ -57,7 +61,8 @@ def latest_versions(session):
             a_tags = ul.find_all('a')
             break
     else:
-        raise Exception('Ничего не нашлось')
+        raise ParserFindAllVersionsException(
+            'Ничего не нашлось - в блоке ul не содержится заданный текст.')
     results = [('Ссылка на документацию', 'Версия', 'Статус')]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
     for a_tag in a_tags:
@@ -72,6 +77,7 @@ def latest_versions(session):
 
 
 def download(session):
+    """Скачивает архив с актуальной документацией."""
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
     response = get_response(session, downloads_url)
     soup = BeautifulSoup(response.text, features='lxml')
@@ -108,7 +114,6 @@ def pep(session):
     soup = BeautifulSoup(response.text, features='lxml')
     main_section = soup.find('section', attrs={'id': 'index-by-category'})
     tbody = main_section.find_all('tbody')
-    status_list_counted = [0] * len(STATUS_LIST)
 
     for item in tqdm(tbody):
         tr = item.find_all('tr')
@@ -116,7 +121,6 @@ def pep(session):
             status = find_tag(tr_tag, 'td').text[1:]
             a_tag = find_tag(tr_tag, 'a', attrs={'class': 'reference'})
             href = a_tag['href']
-
             pep_link = urljoin(PEP_DOC_URL, href)
             pep_response = get_response(session, pep_link)
             pep_soup = BeautifulSoup(pep_response.text, features='lxml')
@@ -134,26 +138,18 @@ def pep(session):
             pattern = r'.*?Status:\n(?P<status>.*?)\n'
             status_match = re.search(pattern, headers.get_text())
             full_status = status_match.group('status')
-            real_status = (
-                [keys for keys, values in EXPECTED_STATUS.items()
-                    if full_status in values][0] if any(
-                        full_status in values for values in (
-                            EXPECTED_STATUS.values())
-                    ) else None)
+            real_status = next((
+                key for key, values in EXPECTED_STATUS.items() if (
+                    full_status in values)), None)
             get_correct_status(status, real_status, pep_link)
 
             if real_status is not None:
-                status_index = STATUS_LIST.index(real_status)
-                status_list_counted[status_index] += 1
+                STATUS_DICT[real_status] += 1
 
     results = [('Статус', 'Количество')]
-    total = 0
-    for item, status in enumerate(STATUS_LIST):
-        count = status_list_counted[item]
-        total += count
-        results.append((status, count))
+    results.extend(STATUS_DICT.items())
+    total = sum(STATUS_DICT.values())
     results.append(('Total', total))
-
     return results
 
 
